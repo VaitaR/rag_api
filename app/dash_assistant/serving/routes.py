@@ -166,10 +166,11 @@ async def query_dashboards(request: QueryRequest):
     """Query dashboards using multi-signal search with RRF.
     
     This endpoint:
-    1. Runs parallel searches (FTS, Vector, Trigram)
-    2. Combines results using Reciprocal Rank Fusion (RRF)
-    3. Builds structured answers with explanations
-    4. Returns results with debug information
+    1. Logs the query to query_log table
+    2. Runs parallel searches (FTS, Vector, Trigram)
+    3. Combines results using Reciprocal Rank Fusion (RRF)
+    4. Builds structured answers with explanations
+    5. Returns results with debug information including qid
     """
     logger.info(f"Processing query: '{request.q}' with top_k={request.top_k}")
     
@@ -182,6 +183,19 @@ async def query_dashboards(request: QueryRequest):
         )
     
     try:
+        # Log query to database first
+        qid = await DashAssistantDB.fetch_value("""
+            INSERT INTO query_log (user_id, query_text, intent_json)
+            VALUES ($1, $2, $3)
+            RETURNING qid
+        """, "api_user", request.q, {
+            "source": "api",
+            "top_k": request.top_k,
+            "filters": request.filters
+        })
+        
+        logger.debug(f"Logged query with qid={qid}")
+        
         # Initialize retriever
         retriever = DashRetriever()
         
@@ -199,6 +213,7 @@ async def query_dashboards(request: QueryRequest):
         
         # Prepare debug information
         debug_info = {
+            "qid": qid,
             "query": request.q,
             "top_k": request.top_k,
             "filters": request.filters,
@@ -219,7 +234,25 @@ async def query_dashboards(request: QueryRequest):
                         "individual_scores": candidate.get('individual_scores', {})
                     }
         
-        logger.info(f"Query completed: {len(answer['results'])} results returned")
+        # Update query_log with search results scores
+        if candidates:
+            scores_data = {
+                "top_results": [
+                    {
+                        "entity_id": c.get('entity_id'),
+                        "title": c.get('title'),
+                        "rrf_score": c.get('score', 0),
+                        "signal_sources": c.get('signal_sources', [])
+                    }
+                    for c in candidates[:5]  # Store top 5 results
+                ]
+            }
+            
+            await DashAssistantDB.execute_query("""
+                UPDATE query_log SET scores = $1 WHERE qid = $2
+            """, scores_data, qid)
+        
+        logger.info(f"Query completed: qid={qid}, {len(answer['results'])} results returned")
         
         return QueryResponse(
             results=answer['results'],

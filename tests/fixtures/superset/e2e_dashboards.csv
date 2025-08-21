@@ -1,0 +1,3 @@
+superset_id,dashboard_slug,title,description,owner,url
+1,user-retention-dashboard,User Retention Dashboard,Dashboard showing user retention metrics and cohort analysis,john.doe@company.com,https://superset.company.com/dashboard/1/
+4,marketing-performance,Marketing Performance,Marketing campaign effectiveness and ROI analysis,alice.brown@company.com,https://superset.company.com/dashboard/4/

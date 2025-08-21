@@ -1,0 +1,10 @@
+enrichment_rules:
+  - dashboard_slug: "user-retention-dashboard"
+    domain: "product"
+    tags: ["retention", "cohort", "users"]
+    usage_score: 0.9
+    
+  - dashboard_slug: "marketing-performance"  
+    domain: "marketing"
+    tags: ["campaigns", "roi", "funnel"]
+    usage_score: 0.8
