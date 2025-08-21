@@ -65,7 +65,13 @@ app.add_middleware(
 
 app.add_middleware(LogMiddleware)
 
-app.middleware("http")(security_middleware)
+# Only add security middleware if not in demo mode
+import os
+demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+if not demo_mode:
+    app.middleware("http")(security_middleware)
+else:
+    logger.info("Demo mode: security middleware disabled")
 
 # Set state variables for use in routes
 app.state.CHUNK_SIZE = CHUNK_SIZE

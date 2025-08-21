@@ -12,7 +12,14 @@ async def security_middleware(request: Request, call_next):
     async def next_middleware_call():
         return await call_next(request)
 
+    # Skip auth for docs and health endpoints
     if request.url.path in {"/docs", "/openapi.json", "/health"}:
+        return await next_middleware_call()
+    
+    # Skip auth completely in demo mode
+    demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+    if demo_mode:
+        logger.info(f"Demo mode: skipping auth for {request.url.path}")
         return await next_middleware_call()
 
     jwt_secret = os.getenv("JWT_SECRET")
