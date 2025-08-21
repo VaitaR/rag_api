@@ -47,6 +47,7 @@ class AnswerBuilder:
         """
         # Extract basic fields
         result_item = {
+            'entity_id': candidate.get('entity_id'),
             'title': candidate.get('title', ''),
             'url': candidate.get('url', ''),
             'score': candidate.get('score', 0.0)
@@ -57,6 +58,7 @@ class AnswerBuilder:
         processed_charts = []
         for chart in charts[:3]:  # Limit to maximum 3 charts
             chart_item = {
+                'chart_id': chart.get('chart_id'),
                 'title': chart.get('title', ''),
                 'url': chart.get('url', '')
             }
