@@ -1,0 +1,21 @@
+# Fast development override - mounts code as volume
+services:
+  fastapi:
+    volumes:
+      - ./app:/app/app:ro  # Mount app code as read-only
+      - ./main.py:/app/main.py:ro  # Mount main.py
+      - ./tests:/app/tests:ro  # Mount tests
+    environment:
+      - PYTHONPATH=/app
+      - DEMO_MODE=true
+      - EMBEDDINGS_PROVIDER=MOCK
+      - EMBEDDINGS_DIMENSION=3072
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=rag_api
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - DEFAULT_TOPK=5
+      - RRF_K=60
+      - LOG_LEVEL=INFO
+      - SLACK_SIGNING_SECRET=92233b0c84104a67e88eea99a1d2e892
