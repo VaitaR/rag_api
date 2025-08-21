@@ -24,6 +24,7 @@ from app.config import (
 from app.middleware import security_middleware
 from app.routes import document_routes, pgvector_routes
 from app.dash_assistant.serving import router as dash_router
+from app.dash_assistant.slack import router as slack_router
 from app.services.database import PSQLDatabase, ensure_vector_indexes
 
 
@@ -65,7 +66,13 @@ app.add_middleware(
 
 app.add_middleware(LogMiddleware)
 
-app.middleware("http")(security_middleware)
+# Only add security middleware if not in demo mode
+import os
+demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
+if not demo_mode:
+    app.middleware("http")(security_middleware)
+else:
+    logger.info("Demo mode: security middleware disabled")
 
 # Set state variables for use in routes
 app.state.CHUNK_SIZE = CHUNK_SIZE
@@ -74,6 +81,7 @@ app.state.PDF_EXTRACT_IMAGES = PDF_EXTRACT_IMAGES
 
 # Include routers
 app.include_router(document_routes.router)
+app.include_router(slack_router)
 app.include_router(dash_router)
 if debug_mode:
     app.include_router(router=pgvector_routes.router)

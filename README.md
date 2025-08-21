@@ -394,3 +394,73 @@ Run the following commands to install pre-commit formatter, which uses [black](h
 pip install pre-commit
 pre-commit install
 ```
+
+## 🚀 Quick Demo Setup
+
+### Fast Development Mode
+For rapid development and testing without long Docker builds:
+
+```bash
+# Start demo with code mounted as volume (fast updates)
+docker-compose -f docker-compose.demo.yaml -f docker-compose.dev.yaml up -d
+
+# Test API endpoints
+./test-quick.sh
+
+# Access Swagger UI (no auth required in demo)
+open http://localhost:8000/docs
+```
+
+**Benefits:**
+- ✅ Code changes apply instantly (no rebuild)
+- ✅ Starts in ~10 seconds vs 10+ minutes
+- ✅ Perfect for development and debugging
+
+### Slack Integration
+
+#### Setup
+1. **Enable Slack routes** (already done in main.py):
+   ```python
+   from app.dash_assistant.slack import router as slack_router
+   app.include_router(slack_router)
+   ```
+
+2. **Create ngrok tunnel**:
+   ```bash
+   ngrok http 8000
+   # Use the HTTPS URL in Slack App settings
+   ```
+
+3. **Configure Slack App** at https://api.slack.com/apps:
+   - **Slash Commands**: `/dash-search` → `https://your-ngrok-url/slack/command`
+   - **Interactivity**: On → `https://your-ngrok-url/slack/interactive`
+   - **OAuth Scopes**: `commands`, `chat:write`
+   - **Reinstall to Workspace**
+
+#### Usage
+```
+/dash-search retention
+```
+Returns formatted cards with 👍/👎 feedback buttons.
+
+#### Health Check
+```bash
+curl https://your-ngrok-url/slack/health
+# {"status":"healthy","service":"slack-integration"}
+```
+
+### Development Modes
+
+| Mode | Command | Use Case | Speed |
+|------|---------|----------|-------|
+| **Fast Dev** | `docker-compose -f docker-compose.demo.yaml -f docker-compose.dev.yaml up -d` | Development, debugging | ~10s |
+| **Full Build** | `docker-compose -f docker-compose.demo.yaml up -d --build` | Production testing | ~10min |
+
+### Demo Features
+- ✅ **No Authentication** required (DEMO_MODE=true)
+- ✅ **Mock Embeddings** (no OpenAI API key needed)
+- ✅ **Sample Data** (2 dashboards, 4 charts)
+- ✅ **Full Search** (FTS + Vector + Trigram)
+- ✅ **Query Logging** and **Feedback Tracking**
+- ✅ **Slack Integration** with interactive buttons
+

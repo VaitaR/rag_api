@@ -6,6 +6,7 @@ from typing import Dict, List, Any, Optional, Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+import json
 from app.config import logger
 from app.dash_assistant.db import DashAssistantDB
 from app.dash_assistant.ingestion.index_jobs import IndexJob
@@ -188,11 +189,11 @@ async def query_dashboards(request: QueryRequest):
             INSERT INTO query_log (user_id, query_text, intent_json)
             VALUES ($1, $2, $3)
             RETURNING qid
-        """, "api_user", request.q, {
+        """, "api_user", request.q, json.dumps({
             "source": "api",
             "top_k": request.top_k,
-            "filters": request.filters
-        })
+            "filters": request.filters or {}
+        }))
         
         logger.debug(f"Logged query with qid={qid}")
         
@@ -250,7 +251,7 @@ async def query_dashboards(request: QueryRequest):
             
             await DashAssistantDB.execute_query("""
                 UPDATE query_log SET scores = $1 WHERE qid = $2
-            """, scores_data, qid)
+            """, json.dumps(scores_data), qid)
         
         logger.info(f"Query completed: qid={qid}, {len(answer['results'])} results returned")
         
