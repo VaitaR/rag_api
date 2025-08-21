@@ -4,11 +4,12 @@ from typing import Dict, List, Any
 from app.config import logger
 
 
-def build_slack_blocks(answer: Dict[str, Any]) -> List[Dict[str, Any]]:
+def build_slack_blocks(answer: Dict[str, Any], qid: int = None) -> List[Dict[str, Any]]:
     """Build Slack blocks from dash assistant answer.
     
     Args:
         answer: Answer dictionary from answer_builder
+        qid: Query ID for feedback tracking
         
     Returns:
         List of Slack block kit blocks
@@ -50,7 +51,7 @@ def build_slack_blocks(answer: Dict[str, Any]) -> List[Dict[str, Any]]:
         blocks.append(result_section)
         
         # Action buttons for this result
-        actions_block = _build_actions_block(result)
+        actions_block = _build_actions_block(result, qid)
         blocks.append(actions_block)
     
     # Add suggested filters if available
@@ -64,7 +65,7 @@ def build_slack_blocks(answer: Dict[str, Any]) -> List[Dict[str, Any]]:
     return blocks
 
 
-def _build_result_section(result: Dict[str, Any], index: int) -> Dict[str, Any]:
+def _build_result_section(result: Dict[str, Any], index: int, qid: int = None) -> Dict[str, Any]:
     """Build section block for a single result.
     
     Args:
@@ -126,21 +127,23 @@ def _build_result_section(result: Dict[str, Any], index: int) -> Dict[str, Any]:
     }
 
 
-def _build_actions_block(result: Dict[str, Any]) -> Dict[str, Any]:
+def _build_actions_block(result: Dict[str, Any], qid: int = None) -> Dict[str, Any]:
     """Build actions block with buttons for a result.
     
     Args:
         result: Single result from answer
+        qid: Query ID for feedback tracking
         
     Returns:
         Slack actions block
     """
+    import json
     url = result.get('url', '')
     entity_id = result.get('entity_id', 0)
     
     elements = []
     
-    # "Открыть" button
+    # "Открыть" button - URL buttons don't need action_id
     if url:
         elements.append({
             "type": "button",
@@ -150,9 +153,10 @@ def _build_actions_block(result: Dict[str, Any]) -> Dict[str, Any]:
             },
             "url": url,
             "style": "primary"
+            # URL buttons should NOT have action_id
         })
     
-    # Thumbs up button
+    # Simple feedback buttons
     elements.append({
         "type": "button",
         "text": {
@@ -163,19 +167,19 @@ def _build_actions_block(result: Dict[str, Any]) -> Dict[str, Any]:
         "action_id": f"feedback_up_{entity_id}"
     })
     
-    # Thumbs down button
     elements.append({
         "type": "button",
         "text": {
             "type": "plain_text",
             "text": "👎"
         },
-        "value": "down",
+        "value": "down", 
         "action_id": f"feedback_down_{entity_id}"
     })
     
     return {
         "type": "actions",
+        "block_id": f"fb_{qid}" if qid else "fb_0",
         "elements": elements
     }
 
@@ -238,17 +242,18 @@ def _escape_slack_text(text: str) -> str:
     return text
 
 
-def build_slack_response_for_query(query: str, answer: Dict[str, Any]) -> Dict[str, Any]:
+def build_slack_response_for_query(query: str, answer: Dict[str, Any], qid: int = None) -> Dict[str, Any]:
     """Build complete Slack response for a query.
     
     Args:
         query: Original user query
         answer: Answer from dash assistant
+        qid: Query ID for feedback tracking
         
     Returns:
         Complete Slack response with blocks and metadata
     """
-    blocks = build_slack_blocks(answer)
+    blocks = build_slack_blocks(answer, qid)
     
     # Build response text (fallback for notifications)
     results_count = len(answer.get('results', []))
@@ -260,10 +265,7 @@ def build_slack_response_for_query(query: str, answer: Dict[str, Any]) -> Dict[s
     return {
         "response_type": "in_channel",  # Make response visible to all
         "text": response_text,
-        "blocks": blocks,
-        "metadata": {
-            "query": query,
-            "results_count": results_count,
-            "has_suggested_filters": bool(answer.get('suggested_filters'))
-        }
+        "blocks": blocks
+        # Note: metadata not supported in slash command responses
+        # qid is embedded in button values instead
     }
