@@ -168,7 +168,7 @@ class DashRetriever:
                 FROM bi_entity e
                 JOIN bi_chunk c ON e.entity_id = c.entity_id
                 WHERE {where_clause}
-                ORDER BY c.embedding <=> $1, e.usage_score DESC
+                ORDER BY vector_score DESC, e.usage_score DESC
                 LIMIT {limit}
             """
             

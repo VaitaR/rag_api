@@ -4,6 +4,7 @@ import json
 import hashlib
 import hmac
 import time
+import asyncio
 from typing import Dict, Any, Optional
 from urllib.parse import parse_qs
 from fastapi import APIRouter, HTTPException, Request, Form, status
@@ -55,65 +56,106 @@ def verify_slack_signature(raw_body: bytes, timestamp: str, signature: str) -> b
 
 @router.post("/command")
 async def handle_slash_command(request: Request):
-    """Handle Slack slash command for dashboard search."""
+    """Handle Slack slash command for dashboard search.
+    
+    To avoid Slack invalid_command_response (3s timeout), we ACK immediately
+    and perform the search asynchronously, responding via response_url.
+    """
     # Get raw body and headers for signature verification
     raw_body = await request.body()
     timestamp = request.headers.get("X-Slack-Request-Timestamp", "0")
     signature = request.headers.get("X-Slack-Signature", "")
-    
+
     # Verify signature BEFORE parsing
     if not verify_slack_signature(raw_body, timestamp, signature):
         logger.warning("Invalid Slack signature")
         raise HTTPException(status_code=401, detail="Invalid Slack signature")
-    
-    # Parse form data from raw body
+
+    # Slack sends x-www-form-urlencoded body
     form_data = parse_qs(raw_body.decode())
     text = (form_data.get("text") or [""])[0].strip()
     user_id = (form_data.get("user_id") or [""])[0]
     user_name = (form_data.get("user_name") or [""])[0]
     channel_id = (form_data.get("channel_id") or [""])[0]
     command = (form_data.get("command") or [""])[0]
-    
+    response_url = (form_data.get("response_url") or [""])[0]
+
     logger.info(f"Slack command received: {command} '{text}' from user {user_name}")
-    
-    # Check database health
-    if not await DashAssistantDB.health_check():
-        logger.error("Database health check failed")
-        return {
-            "response_type": "ephemeral",
-            "text": "❌ Сервис временно недоступен. Попробуйте позже."
-        }
-    
-    # Validate command
+
+    # Validate command early and ACK fast
     if not text:
         return {
             "response_type": "ephemeral",
             "text": "❓ Пожалуйста, укажите поисковый запрос. Например: `/dash-search revenue analytics`"
         }
-    
-    try:
-        # Log query to database
-        qid = await _log_slack_query(user_id, user_name, text, channel_id)
-        
-        # Perform search
-        retriever = DashRetriever()
-        candidates = await retriever.search(query=text, top_k=5)
-        
-        # Build answer
-        answer = build_answer(text, candidates)
-        
-        # Build Slack response with qid for feedback
-        slack_response = build_slack_response_for_query(text, answer, qid)
-        
-        logger.info(f"Slack search completed: {len(answer['results'])} results for '{text}'")
-        return slack_response
-        
-    except Exception as e:
-        logger.error(f"Slack command processing failed: {e}")
-        return {
-            "response_type": "ephemeral",
-            "text": f"❌ Произошла ошибка при поиске: {str(e)}"
-        }
+
+    # Fire-and-forget task to perform the search and post results via response_url
+    async def _do_search_and_respond():
+        try:
+            # Health check inside async task (do not block ACK)
+            if not await DashAssistantDB.health_check():
+                if response_url:
+                    async with httpx.AsyncClient(timeout=5) as client:
+                        await client.post(response_url, json={
+                            "response_type": "ephemeral",
+                            "text": "❌ Сервис временно недоступен. Попробуйте позже."
+                        })
+                return
+
+            qid = await _log_slack_query(user_id, user_name, text, channel_id)
+
+            retriever = DashRetriever()
+            candidates = await retriever.search(query=text, top_k=5)
+
+            answer = build_answer(text, candidates)
+            slack_msg = build_slack_response_for_query(text, answer, qid)
+            # Ensure response is posted via response_url
+            slack_msg["response_type"] = "in_channel"
+
+            if response_url:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.post(response_url, json=slack_msg)
+                    logger.info(
+                        f"Posted slack search result via response_url: status={resp.status_code}, ok={200 <= resp.status_code < 300}"
+                    )
+                    if resp.status_code >= 300:
+                        # Fallback: try simplified payload without action buttons
+                        try:
+                            blocks = slack_msg.get("blocks", [])
+                            simplified_blocks = [b for b in blocks if b.get("type") != "actions"]
+                            fallback = {
+                                "response_type": "ephemeral",
+                                "text": slack_msg.get("text", "Результаты поиска"),
+                                "blocks": simplified_blocks or None,
+                            }
+                            resp2 = await client.post(response_url, json=fallback)
+                            logger.info(
+                                f"Posted fallback slack message: status={resp2.status_code}, ok={200 <= resp2.status_code < 300}"
+                            )
+                        except Exception as e2:
+                            logger.error(f"Failed to post fallback slack message: {e2}")
+            logger.info(
+                f"Slack async search completed: {len(answer.get('results', []))} results for '{text}'"
+            )
+        except Exception as e:
+            logger.error(f"Slack async processing failed: {e}")
+            if response_url:
+                try:
+                    async with httpx.AsyncClient(timeout=5) as client:
+                        await client.post(response_url, json={
+                            "response_type": "ephemeral",
+                            "text": f"❌ Произошла ошибка при поиске: {str(e)}"
+                        })
+                except Exception:
+                    pass
+
+    asyncio.create_task(_do_search_and_respond())
+
+    # Immediate ACK to avoid Slack timeout
+    return {
+        "response_type": "ephemeral",
+        "text": f"🔎 Ищу дашборды по запросу: '{text}'..."
+    }
 
 
 @router.post("/interactive")

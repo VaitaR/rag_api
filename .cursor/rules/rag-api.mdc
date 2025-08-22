@@ -99,6 +99,9 @@ docker-compose -f docker-compose.demo.yaml up -d --build
 - Нет circular imports
 - Секреты через .env, не инлайн
 - Comprehensive logging на всех уровнях
+
+EMBEDDINGS_DIM - 1536 
+
 globs:
 alwaysApply: false
 ---

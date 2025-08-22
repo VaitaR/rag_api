@@ -177,9 +177,11 @@ def _build_actions_block(result: Dict[str, Any], qid: int = None) -> Dict[str, A
         "action_id": "feedback"
     })
     
+    # Ensure unique block_id per result to avoid Slack validation issues
+    unique_block_id = f"fb_{qid}_{entity_id}" if qid else f"fb_0_{entity_id}"
     return {
         "type": "actions",
-        "block_id": f"fb_{qid}" if qid else "fb_0",
+        "block_id": unique_block_id,
         "elements": elements
     }
 

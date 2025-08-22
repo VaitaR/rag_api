@@ -262,10 +262,10 @@ def init_embeddings(provider, model):
             
             def embed_documents(self, texts):
                 # Return dummy embeddings for compatibility
-                return [[0.0] * 3072 for _ in texts]
+                return [[0.0] * 1536 for _ in texts]
             
             def embed_query(self, text):
-                return [0.0] * 3072
+                return [0.0] * 1536
         
         return MockLangChainEmbeddings()
     else:
@@ -303,7 +303,7 @@ elif EMBEDDINGS_PROVIDER == EmbeddingsProvider.BEDROCK:
     AWS_DEFAULT_REGION = get_env_variable("AWS_DEFAULT_REGION", "us-east-1")
 elif EMBEDDINGS_PROVIDER == EmbeddingsProvider.MOCK:
     EMBEDDINGS_MODEL = "mock"
-    EMBEDDINGS_DIM = int(get_env_variable("EMBEDDINGS_DIM", "3072"))
+    EMBEDDINGS_DIM = int(get_env_variable("EMBEDDINGS_DIM", "1536"))
     EMBEDDINGS_SEED = int(get_env_variable("EMBEDDINGS_SEED", "42"))
 else:
     raise ValueError(f"Unsupported embeddings provider: {EMBEDDINGS_PROVIDER}")
