@@ -204,7 +204,7 @@ async def handle_interactive_component(request: Request):
         logger.info(f"Interactive action: {action_id} = {value} from user {user.get('id')}")
         
         # Process feedback action
-        if action_id == "feedback":
+        if action_id in ("feedback", "feedback_up", "feedback_down"):
             return await _process_feedback_action(payload, action, user)
         
         return {"text": "Действие обработано"}
@@ -250,11 +250,27 @@ async def _process_feedback_action(payload: Dict[str, Any], action: Dict[str, An
         
         qid = feedback_data.get("qid")
         vote = feedback_data.get("vote")  # "up" or "down"
+        entity_id = feedback_data.get("entity_id")
         
         logger.info(f"Feedback received: qid={qid}, vote={vote}, user={user.get('id')}")
         
-        # Save feedback to database (simplified for now)
-        # In full implementation, update query_log table with feedback
+        # Persist feedback to database
+        try:
+            if qid:
+                await DashAssistantDB.execute_query(
+                    """
+                    UPDATE query_log
+                    SET feedback = $1,
+                        chosen_entity = COALESCE(chosen_entity, $2)
+                    WHERE qid = $3
+                    """,
+                    vote,
+                    int(entity_id) if entity_id else None,
+                    int(qid),
+                )
+                logger.info(f"Feedback persisted: qid={qid}, feedback={vote}, entity_id={entity_id}")
+        except Exception as db_e:
+            logger.error(f"Failed to persist feedback: {db_e}")
         
         # Update message blocks to show feedback was received
         blocks = payload.get("message", {}).get("blocks", []) or []
@@ -266,12 +282,12 @@ async def _process_feedback_action(payload: Dict[str, Any], action: Dict[str, An
                 feedback_text = "✅ Полезно" if vote == "up" else "❌ Не полезно"
                 button_style = "primary" if vote == "up" else "danger"
                 
-                block["elements"] = [{
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": feedback_text},
-                    "style": button_style,
-                    "action_id": "feedback_received"  # Disabled action
-                }]
+                # Replace with static confirmation text to avoid further actions
+                block.clear()
+                block.update({
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": feedback_text}
+                })
                 break
         
         # Update message via response_url for reliable delivery

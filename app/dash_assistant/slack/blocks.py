@@ -156,7 +156,7 @@ def _build_actions_block(result: Dict[str, Any], qid: int = None) -> Dict[str, A
             # URL buttons should NOT have action_id
         })
     
-    # Feedback buttons with unified action_id and JSON value
+    # Feedback buttons with distinct action_id per button
     elements.append({
         "type": "button",
         "text": {
@@ -164,7 +164,7 @@ def _build_actions_block(result: Dict[str, Any], qid: int = None) -> Dict[str, A
             "text": "👍"
         },
         "value": json.dumps({"qid": qid, "vote": "up", "entity_id": entity_id}),
-        "action_id": "feedback"
+        "action_id": "feedback_up"
     })
     
     elements.append({
@@ -174,7 +174,7 @@ def _build_actions_block(result: Dict[str, Any], qid: int = None) -> Dict[str, A
             "text": "👎"
         },
         "value": json.dumps({"qid": qid, "vote": "down", "entity_id": entity_id}),
-        "action_id": "feedback"
+        "action_id": "feedback_down"
     })
     
     # Ensure unique block_id per result to avoid Slack validation issues
