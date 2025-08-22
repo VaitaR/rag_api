@@ -50,7 +50,7 @@ class BaseEmbedder(ABC):
 class MockEmbedder(BaseEmbedder):
     """Mock embedder for testing with deterministic output."""
     
-    def __init__(self, seed: int = 42, dimension: int = 3072):
+    def __init__(self, seed: int = 42, dimension: int = 1536):
         """Initialize mock embedder.
         
         Args:

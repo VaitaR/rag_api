@@ -83,6 +83,15 @@ app/dash_assistant/
 ├── db.py # Database utilities
 └── init.py
 
+# Код монтируется как volume - изменения применяются мгновенно
+docker-compose -f docker-compose.demo.yaml -f docker-compose.dev.yaml up -d
+
+# Перезапуск FastAPI без пересборки (если нужно)
+docker-compose -f docker-compose.demo.yaml -f docker-compose.dev.yaml restart fastapi
+
+# Код копируется в образ - нужна пересборка при изменениях
+docker-compose -f docker-compose.demo.yaml up -d --build
+
 ## 🎯 DoD каждого шага
 
 - Все новые тесты зелёные

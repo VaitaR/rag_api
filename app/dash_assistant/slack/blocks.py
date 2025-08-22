@@ -65,7 +65,7 @@ def build_slack_blocks(answer: Dict[str, Any], qid: int = None) -> List[Dict[str
     return blocks
 
 
-def _build_result_section(result: Dict[str, Any], index: int, qid: int = None) -> Dict[str, Any]:
+def _build_result_section(result: Dict[str, Any], index: int) -> Dict[str, Any]:
     """Build section block for a single result.
     
     Args:
@@ -156,15 +156,15 @@ def _build_actions_block(result: Dict[str, Any], qid: int = None) -> Dict[str, A
             # URL buttons should NOT have action_id
         })
     
-    # Simple feedback buttons
+    # Feedback buttons with unified action_id and JSON value
     elements.append({
         "type": "button",
         "text": {
             "type": "plain_text",
             "text": "👍"
         },
-        "value": "up",
-        "action_id": f"feedback_up_{entity_id}"
+        "value": json.dumps({"qid": qid, "vote": "up", "entity_id": entity_id}),
+        "action_id": "feedback"
     })
     
     elements.append({
@@ -173,8 +173,8 @@ def _build_actions_block(result: Dict[str, Any], qid: int = None) -> Dict[str, A
             "type": "plain_text",
             "text": "👎"
         },
-        "value": "down", 
-        "action_id": f"feedback_down_{entity_id}"
+        "value": json.dumps({"qid": qid, "vote": "down", "entity_id": entity_id}),
+        "action_id": "feedback"
     })
     
     return {

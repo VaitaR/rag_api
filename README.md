@@ -105,11 +105,54 @@ curl -X POST "http://localhost:8000/dash/query" \
 
 ### Slack Integration
 
-#### Slack Blocks Structure
-The system generates Slack Block Kit compatible responses:
+Complete Slack integration with slash commands and interactive buttons for dashboard search.
+
+#### Features
+- **Slash Commands**: `/dash-search <query>` for searching dashboards
+- **Interactive Buttons**: Feedback buttons that update after clicking
+- **Block Kit UI**: Rich formatting with dashboard links and charts
+- **Signature Verification**: Secure request validation
+- **Retry Protection**: Handles Slack retry requests properly
+
+#### Setup Slack App
+
+1. **Create Slack App** at https://api.slack.com/apps
+2. **Configure Slash Command**:
+   - Command: `/dash-search`
+   - Request URL: `https://your-domain.com/slack/command`
+   - Description: "Search dashboards"
+   - Usage Hint: `<query>`
+
+3. **Enable Interactivity**:
+   - Request URL: `https://your-domain.com/slack/interactive`
+
+4. **Set Environment Variables**:
+   ```bash
+   export SLACK_SIGNING_SECRET="your_signing_secret_here"
+   ```
+
+5. **Install App** to your workspace and invite bot to channels
+
+#### Slack Endpoints
+
+- `POST /slack/command` - Handles slash commands
+- `POST /slack/interactive` - Handles button interactions
+- `GET /slack/health` - Health check for Slack integration
+
+#### Interactive Button Behavior
+
+When users click feedback buttons (👍/👎), the buttons automatically update to show confirmation:
+- **👍** → **✅ Полезно** (green)
+- **👎** → **❌ Не полезно** (red)
+
+This provides immediate visual feedback that the action was processed.
+
+#### Example Slack Response Structure
 
 ```json
 {
+  "response_type": "in_channel",
+  "text": "По запросу 'retention' найдено 2 дашбордов.",
   "blocks": [
     {
       "type": "header",
@@ -120,39 +163,38 @@ The system generates Slack Block Kit compatible responses:
     },
     {
       "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*User Retention Dashboard* (Score: 0.95)\n📊 *Графики:* Monthly Retention Cohorts (heatmap)\n💡 *Почему:* семантическая близость по содержимому"
-      },
-      "accessory": {
-        "type": "button",
-        "text": {
-          "type": "plain_text",
-          "text": "Открыть"
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*1. User Retention Dashboard*\n<https://superset.company.com/dashboard/42|Открыть дашборд>"
         },
-        "url": "https://superset.company.com/superset/dashboard/42/"
-      }
+        {
+          "type": "mrkdwn",
+          "text": "*Релевантность:* 0.95\n*Почему найден:* семантическая близость по содержимому"
+        }
+      ]
     },
     {
       "type": "actions",
+      "block_id": "fb_123",
       "elements": [
         {
           "type": "button",
-          "text": {
-            "type": "plain_text",
-            "text": "👍 Полезно"
-          },
-          "action_id": "feedback_up",
-          "value": "entity_42"
+          "text": {"type": "plain_text", "text": "Открыть"},
+          "url": "https://superset.company.com/dashboard/42",
+          "style": "primary"
         },
         {
           "type": "button",
-          "text": {
-            "type": "plain_text", 
-            "text": "👎 Не то"
-          },
-          "action_id": "feedback_down",
-          "value": "entity_42"
+          "text": {"type": "plain_text", "text": "👍"},
+          "value": "{\"qid\": 123, \"vote\": \"up\", \"entity_id\": 42}",
+          "action_id": "feedback"
+        },
+        {
+          "type": "button",
+          "text": {"type": "plain_text", "text": "👎"},
+          "value": "{\"qid\": 123, \"vote\": \"down\", \"entity_id\": 42}",
+          "action_id": "feedback"
         }
       ]
     }
@@ -160,25 +202,61 @@ The system generates Slack Block Kit compatible responses:
 }
 ```
 
-#### Feedback Endpoint
+#### Testing Slack Integration
+
 ```bash
-curl -X POST "http://localhost:8000/dash/feedback" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "qid": 123,
-    "entity_id": 42,
-    "chart_id": 456,
-    "feedback": "up"
-  }'
+# Test health check
+curl http://localhost:8000/slack/health
+
+# Test slash command (requires proper Slack signature)
+curl -X POST http://localhost:8000/slack/command \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "text=revenue analytics&user_id=U123&user_name=testuser"
 ```
 
-Response:
-```json
-{
-  "status": "success",
-  "message": "Feedback recorded successfully"
-}
+## Docker Deployment
+
+### Quick Start with Docker Compose
+
+```bash
+# Start all services (database + API)
+docker-compose up -d
+
+# Run migrations
+docker-compose exec fastapi python -m app.dash_assistant.migrate
+
+# Check status
+docker-compose logs fastapi --tail=20
+curl http://localhost:8000/health
+curl http://localhost:8000/dash/health
+curl http://localhost:8000/slack/health
 ```
+
+### Docker Environment Variables
+
+The `docker-compose.yaml` includes all necessary environment variables:
+
+```yaml
+environment:
+  - DB_HOST=db
+  - DB_PORT=5432
+  - DB_NAME=rag_api
+  - DB_USER=postgres
+  - DB_PASSWORD=password
+  - POSTGRES_HOST=db
+  - POSTGRES_PORT=5432
+  - POSTGRES_DB=rag_api
+  - POSTGRES_USER=postgres
+  - POSTGRES_PASSWORD=password
+```
+
+### Vector Embeddings Configuration
+
+The system uses **1536-dimensional embeddings** (compatible with OpenAI standard) to work with pgvector 0.5.1 limitations:
+
+- **Mock Embeddings** (default): Deterministic vectors for testing
+- **OpenAI Embeddings**: Set `EMBEDDINGS_PROVIDER=OPENAI` and `OPENAI_API_KEY`
+- **Dimension**: Configurable via `EMBEDDINGS_DIMENSION` (default: 1536)
 
 ## Makefile Commands
 
