@@ -41,7 +41,7 @@ Keep this file short and practical. Update it whenever you change structure or f
   - `serving/`
     - `routes.py`: Dash API (`/dash/ingest`, `/dash/query`, `/dash/feedback`, `/dash/health`, `/dash/stats`).
     - `answer_builder.py`, `retriever.py`: RRF search and structured answers.
-  - `slack/`: Slack blocks + routes (health and interactions if enabled).
+  - `slack/`: Slack integration (`/slack/command`, `/slack/interactive`, `/slack/health`) with signature verification.
 
 ### Runtime modes
 - Demo: `docker-compose -f docker-compose.demo.yaml up -d` (or `make demo`).
@@ -51,8 +51,9 @@ Keep this file short and practical. Update it whenever you change structure or f
 
 ### Core flows (how modules connect)
 - ID-based RAG (documents API)
-  - Requests → `main.py` → `app/routes/document_routes.py` → vector store in `app/services/vector_store/*`.
+  - Requests → `main.py` → `middleware.py` (JWT auth) → `app/routes/document_routes.py` → vector store.
   - Uploads stored under `RAG_UPLOAD_DIR`; text split via `langchain_text_splitters`.
+  - User authorization: JWT payload `user.id` must match document `user_id` metadata.
 
 - Dash Assistant (dashboard search)
   - Ingestion: `python -m app.dash_assistant.ingestion.index_jobs --complete ...`
@@ -61,6 +62,17 @@ Keep this file short and practical. Update it whenever you change structure or f
   - Query: `POST /dash/query` → `serving/retriever.py` (FTS + Vector + Trigram) → RRF → `answer_builder.py`.
   - Feedback: `POST /dash/feedback` updates `query_log`.
   - Health/Stats: `/dash/health`, `/dash/stats` (counts and coverage).
+
+- Slack Integration
+  - `/dash-search <query>` → `/slack/command` → async search → response via `response_url`.
+  - Interactive buttons → `/slack/interactive` → feedback logging + UI updates.
+  - Signature verification via `SLACK_SIGNING_SECRET` (skipped in dev mode).
+
+### API endpoints summary
+- **ID-based RAG**: `/documents/*`, `/query`, `/embed*` (JWT auth required unless demo mode)
+- **Dash Assistant**: `/dash/query`, `/dash/ingest`, `/dash/feedback`, `/dash/health`, `/dash/stats`
+- **Slack**: `/slack/command`, `/slack/interactive`, `/slack/health` (signature verification)
+- **Debug**: `/pgvector/*` (enabled when `DEBUG_RAG_API=true`)
 
 ### Data contracts
 - Ingestion CLI and `/dash/ingest` expect absolute paths; validate existence before load.
@@ -81,16 +93,19 @@ Keep this file short and practical. Update it whenever you change structure or f
 - PG: `POSTGRES_*` and `DB_HOST/DB_PORT`.
 - Embeddings (main app): `EMBEDDINGS_PROVIDER`, `OPENAI_API_KEY` (or MOCK).
 - Dash embeddings (ingestion): configured via `app/dash_assistant/config.py` defaults (MOCK/OpenAI).
-- Demo toggle: `DEMO_MODE=true` to bypass auth.
+- Auth: `JWT_SECRET` (if unset, auth disabled), `DEMO_MODE=true` bypasses all auth.
+- Slack: `SLACK_SIGNING_SECRET` for signature verification (optional, dev default: `test_secret_for_development`).
 
 ### Conventions for edits
 - Keep feature code next to its domain:
   - Dash query logic → `app/dash_assistant/serving/`.
   - Dash ingestion/parsers → `app/dash_assistant/ingestion/`.
   - Document APIs → `app/routes/document_routes.py`.
+  - Auth logic → `app/middleware.py` (JWT verification, demo mode bypass).
 - If schema changes are needed, add a new `.sql` file and run migrate.
 - Prefer async I/O; do not use `print`; use logger from `app/config.py` or `structlog` (dash assistant).
 - Add/adjust tests in `tests/` for any new behavior; keep them deterministic (MOCK embeddings for CI).
+- Auth bypassed when `DEMO_MODE=true` OR `JWT_SECRET` unset; otherwise JWT required for all non-health endpoints.
 
 ### Useful commands
 ```bash
