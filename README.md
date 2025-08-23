@@ -227,7 +227,6 @@ docker-compose exec fastapi python -m app.dash_assistant.migrate
 
 # Check status
 docker-compose logs fastapi --tail=20
-curl http://localhost:8000/health
 curl http://localhost:8000/dash/health
 curl http://localhost:8000/slack/health
 ```
@@ -278,6 +277,13 @@ make optimize-db        # Optimize after loading
 # Utilities
 make migrate-list       # Check migration status
 make help              # Show all commands
+
+# Shortcuts for scripts
+make demo               # Run demo stack
+make prod               # Run production helper
+make monitor            # Show monitoring dashboard
+make test-api           # Run API smoke tests
+make ci-local           # Run local CI checks
 ```
 
 For detailed instructions, see [Dash Assistant README](app/dash_assistant/README.md).
@@ -319,10 +325,8 @@ This ensures tests run deterministically without external dependencies.
 - **Setup pgvector database:**
   - Run an existing PSQL/PGVector setup, or,
   - Docker: `docker compose up` (also starts RAG API)
-    - or, use docker just for DB: `docker compose -f ./db-compose.yaml up`
 - **Run API**:
   - Docker: `docker compose up` (also starts PSQL/pgvector)
-    - or, use docker just for RAG API: `docker compose -f ./api-compose.yaml up`
   - Local:
     - Make sure to setup `DB_HOST` to the correct database hostname
     - Run the following commands (preferably in a [virtual environment](https://realpython.com/python-virtual-environments-a-primer/))
@@ -483,7 +487,7 @@ For rapid development and testing without long Docker builds:
 docker-compose -f docker-compose.demo.yaml -f docker-compose.dev.yaml up -d
 
 # Test API endpoints
-./test-quick.sh
+./scripts/test-api.sh
 
 # Access Swagger UI (no auth required in demo)
 open http://localhost:8000/docs

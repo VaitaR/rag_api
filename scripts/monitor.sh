@@ -60,4 +60,4 @@ echo -e "${BLUE}💾 Resource Usage${NC}"
 docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" 2>/dev/null || echo "Docker stats not available"
 echo
 
-echo "🔄 Auto-refresh: watch -n 5 ./monitor.sh"
+echo "🔄 Auto-refresh: watch -n 5 ./scripts/monitor.sh"

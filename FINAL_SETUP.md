@@ -5,7 +5,7 @@
 ### 🎯 Демо режим (готов к использованию)
 ```bash
 # Запуск за одну команду - никаких настроек не нужно!
-./demo-simple.sh
+./scripts/demo-start.sh
 ```
 
 **Что включает:**
@@ -27,7 +27,7 @@ cp .env.production .env
 # Добавьте ваш OpenAI API ключ и другие настройки
 
 # 3. Запустите
-./production-start.sh
+./scripts/production-start.sh
 ```
 
 ## 📋 Файловая структура
@@ -59,8 +59,8 @@ rag_api_project/
 ### Для разработчиков
 ```bash
 # Тестирование
-./demo-simple.sh
-./test-api.sh
+./scripts/demo-start.sh
+./scripts/test-api.sh
 
 # Разработка
 make test-all
@@ -70,11 +70,11 @@ make lint
 ### Для пользователей
 ```bash
 # Быстрый старт
-./demo-simple.sh
+./scripts/demo-start.sh
 # Откройте http://localhost:8000/docs
 
 # Продакшен
-./production-start.sh
+./scripts/production-start.sh
 ```
 
 ## 🔧 API Endpoints
@@ -111,9 +111,9 @@ curl -X POST "http://localhost:8000/dash/query" \
 
 ## 🎉 Готово к использованию!
 
-1. **Демо**: `./demo-simple.sh` → http://localhost:8000/docs
-2. **Продакшен**: Настройте данные → `./production-start.sh`
+1. **Демо**: `./scripts/demo-start.sh` → http://localhost:8000/docs
+2. **Продакшен**: Настройте данные → `./scripts/production-start.sh`
 3. **Slack**: Настройте токены → используйте `/dash-search`
-4. **Мониторинг**: `./monitor.sh`
+4. **Мониторинг**: `./scripts/monitor.sh`
 
 Все работает из коробки! 🚀

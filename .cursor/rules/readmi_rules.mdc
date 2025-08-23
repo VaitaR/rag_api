@@ -1,0 +1,22 @@
+---
+description: "README Notes (token-minimal)"
+globs:
+  - docs/**
+  - README.md
+  - pyproject.toml
+  - setup.cfg
+  - Makefile
+  - docker/**
+  - .github/workflows/**
+alwaysApply: false
+---
+Make token-minimal README notes.
+One code block; no sentences; lines ≤10 words; "-" bullets.
+Sections order: TREE, KEY FILES, COMMANDS, DO/DON’T, ERRORS→FIX, TODO.
+TREE ascii, depth 2–3, "…" to collapse.
+COMMANDS has ```bash``` fenced block.
+Keep: structure, key files, commands, rules, errors→fix, todo.
+Prefer config (pyproject, setup.cfg, Makefile, Dockerfile, CI) over prose.
+No hallucinations; use existing uv/poetry/pip; config > prose.
+If unsure: up to 3 "TBD?" items.
+Use template exactly:

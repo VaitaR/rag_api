@@ -60,6 +60,9 @@ htmlcov/
 .pytest_cache/
 coverage.xml
 
+# Benchmarks
+.benchmarks/
+
 # OS
 .DS_Store
 .DS_Store?

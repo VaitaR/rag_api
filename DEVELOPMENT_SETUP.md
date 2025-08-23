@@ -24,8 +24,8 @@ rag_api_project/
 ├── main.py                # FastAPI application entry point
 ├── requirements.txt       # Python dependencies
 ├── .env                   # Environment variables (created by setup)
-├── setup_env.sh          # Environment setup script
-└── venv/                 # Python virtual environment
+├── scripts/setup_env.sh   # Environment setup script
+└── venv/                  # Python virtual environment
 ```
 
 ## Quick Start

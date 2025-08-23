@@ -66,4 +66,4 @@ echo
 echo "💡 Tips:"
 echo "  - If any tests fail, check docker logs: docker-compose logs fastapi"
 echo "  - View API docs at: $BASE_URL/docs"
-echo "  - Monitor with: ./monitor.sh"
+echo "  - Monitor with: ./scripts/monitor.sh"

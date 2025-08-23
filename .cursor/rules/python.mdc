@@ -1,0 +1,70 @@
+---
+description: "Python Code Quality (LLM-aware, 2025)"
+globs:
+  - src/**
+  - app/**
+  - scripts/**
+  - pyproject.toml
+  - setup.cfg
+  - .github/workflows/**
+alwaysApply: false
+---
+
+GOAL
+- Generate/refactor Python code: correct, typed, maintainable, deterministic.
+
+TARGETS
+- Python 3.12, 3.11
+- Use PEP 695 type params; prefer `type` aliases. 
+- Use `typing.override` on overrides (PEP 698).
+- Prefer `Self`, `Protocol`, `TypedDict` where adequate.
+
+STYLE & TOOLING
+- Single source of truth: `pyproject.toml`.
+- Formatter: `ruff format` (no Black). Lint: ruff.
+- Type checker: pyright (fast) or mypy; keep strict.
+- Pkg mgmt: `uv` (lockfile, scripts) or project’s choice.
+- Tests: pytest (+ coverage); property tests where value-add.
+
+CODE RULES
+- Public API: full annotations; no implicit `Any`.
+- Use `from __future__ import annotations` if <3.13.
+- Prefer pure functions; isolate side effects.
+- No mutable defaults; dataclasses `slots=True` when stable.
+- Use `Enum/StrEnum` (3.11+) for finite sets.
+- Errors: custom exceptions; no bare `except`; preserve cause (`raise ... from e`).
+- IO/Net: no work at import time; async: no blocking calls.
+- Logging: stdlib logging, structured fields; no prints in libs.
+- Config: pydantic v2 for settings (optional); no .env access in libs.
+- Imports: absolute; minimal surface in `__init__`.
+- Performance: avoid N^2 in hot paths; prefer `itertools`, batched IO.
+
+LLM GUARDRAILS
+- Do not invent APIs/deps; use repo and stdlib first.
+- If new dep strictly needed: propose block `DEPENDENCY-PROPOSAL` (name, reason, alt).
+- Only modify files under `src/`, `tests/`, `scripts/` unless asked.
+- Determinism: stable seeds, no time/network in tests; freeze time.
+- If uncertain: insert `TBD?` (≤2 per file) and stop.
+
+TESTING
+- Layout: `tests/unit/**`, `tests/integration/**`.
+- Unit cover public API; integration use test DB/clients.
+- AAA pattern; `pytest.mark.parametrize`; minimal mocks.
+- Coverage gate: ≥80% file-level (or project setting).
+
+DOCS
+- Docstrings for public API (Google or NumPy style, project’s choice).
+- Brief module header: purpose, invariants, exceptions.
+
+CI HOOKS (suggest, do not change without ask)
+- ruff lint+format; pyright/mypy strict; pytest+coverage.
+- Fail on formatting/lint/type errors.
+
+ANTI-PATTERNS (reject)
+- Global state; hidden I/O; runtime import hacks.
+- Broad `except Exception`; silent pass/print.
+- Overuse of singletons; tight coupling to frameworks.
+- Copying logic into tests; snapshotting unstable output.
+
+ON CONFLICTS
+- Follow existing config over this rule; explain deviation inline.

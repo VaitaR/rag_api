@@ -1,6 +1,6 @@
 # Makefile for RAG API Project
 
-.PHONY: help migrate migrate-dry migrate-list migrate-rollback test-schema docker-up docker-down optimize-db analyze-db setup-complete setup-dev test-ci
+.PHONY: help migrate migrate-dry migrate-list migrate-rollback test-schema docker-up docker-down optimize-db analyze-db setup-complete setup-dev test-ci demo prod monitor test-api ci-local setup-env
 
 help: ## Show this help message
 	@echo "Available commands:"
@@ -34,10 +34,10 @@ docker-down: ## Stop all services
 	docker-compose down
 
 docker-db: ## Start only database service
-	docker-compose -f db-compose.yaml up -d
+	docker-compose up -d db
 
 docker-api: ## Start only API service
-	docker-compose -f api-compose.yaml up -d
+	docker-compose up -d fastapi
 
 # Development
 install-deps: ## Install Python dependencies
@@ -79,9 +79,6 @@ ingest-markdown: ## Load markdown documentation
 ingest-enrichment: ## Apply enrichment configuration
 	python -m app.dash_assistant.ingestion.index_jobs --enrichment-yaml tests/fixtures/superset/enrichment.yaml
 
-test-ingestion: ## Run ingestion tests
-	pytest tests/dash_assistant/test_ingestion.py -v
-
 # Database optimization
 optimize-db: ## Optimize database after mass loading (run ANALYZE)
 	psql -h localhost -U postgres -d rag_api -c "SELECT optimize_after_mass_loading();"
@@ -95,6 +92,25 @@ setup-complete: docker-db migrate ingest-complete optimize-db ## Complete setup:
 # Quick development setup
 setup-dev: docker-db migrate ## Quick dev setup: DB + migrations only
 
+# Script shortcuts
+demo: ## Run demo stack and load demo data
+	./scripts/demo-start.sh
+
+prod: ## Run production startup helper
+	./scripts/production-start.sh
+
+monitor: ## Show monitoring dashboard
+	./scripts/monitor.sh
+
+test-api: ## Run API smoke tests
+	./scripts/test-api.sh
+
+ci-local: ## Test CI workflow locally (requires running PostgreSQL)
+	./scripts/test_ci_locally.sh
+
+setup-env: ## Create local .env template
+	./scripts/setup_env.sh
+
 # CI testing
 test-ci: ## Test CI workflow locally (requires running PostgreSQL)
-	./test_ci_locally.sh
+	./scripts/test_ci_locally.sh

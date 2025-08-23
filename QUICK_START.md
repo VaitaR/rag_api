@@ -18,7 +18,7 @@ git clone <your-repo-url>
 cd rag_api_project
 
 # 2. Запустите демо
-./demo-start.sh
+./scripts/demo-start.sh
 ```
 
 **Что включает демо:**
@@ -34,10 +34,10 @@ cd rag_api_project
 
 ```bash
 # Автоматическое тестирование всех endpoints
-./test-api.sh
+./scripts/test-api.sh
 
 # Мониторинг системы
-./monitor.sh
+./scripts/monitor.sh
 
 # Ручное тестирование
 curl -X POST "http://localhost:8000/dash/query" \
@@ -86,7 +86,7 @@ cp .env.production .env
 ### 3. Запустите продакшен
 
 ```bash
-./production-start.sh
+./scripts/production-start.sh
 ```
 
 ## 🛠️ Управление
