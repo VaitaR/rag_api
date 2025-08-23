@@ -7,8 +7,8 @@ Keep this file short and practical. Update it whenever you change structure or f
 - Run prod helper: `make prod` (auth on unless `DEMO_MODE=true`).
 - Start base stack: `make docker-up` → `make migrate`.
 - Load sample data: `make ingest-complete` (uses `tests/fixtures/superset/*`).
-- Tests: `pytest -q` (ensure DB up: `make docker-db && make migrate`).
-- Lint/type-check: `ruff check app/ tests/` and `mypy app/`.
+- Tests: `make test-all` or `pytest -q` (ensure DB up: `make docker-db && make migrate`).
+- Lint/type-check: `make lint` or `ruff check app/ tests/` and `mypy app/`.
 
 ### Layout (what is where)
 - Root
@@ -106,11 +106,19 @@ make ingest-complete      # load sample superset fixtures
 # Demo / Prod helpers
 make demo                 # demo stack and ingestion
 make prod                 # production helper script
+make monitor              # monitoring dashboard
+make test-api             # API smoke tests
 
 # QA
-pytest -q                 # run tests
-ruff check app/ tests/    # lint
-mypy app/                 # types
+make test-all             # all tests
+make lint                 # ruff + mypy
+make ci-local             # full CI locally
+pytest -q                 # run tests directly
+ruff check app/ tests/    # lint directly
+mypy app/                 # types directly
+
+# Scripts (moved to scripts/ directory)
+make setup-env            # environment setup helper
 ```
 
 

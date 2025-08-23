@@ -1,548 +1,135 @@
-﻿# RAG API with Dash Assistant
+﻿# RAG API & Dash Assistant
 
-## Overview
-This project integrates Langchain with FastAPI in an Asynchronous, Scalable manner, providing a framework for document indexing and retrieval, using PostgreSQL/pgvector.
+This project provides a robust, scalable API for Retrieval-Augmented Generation (RAG) tasks, built with FastAPI, LangChain, and PostgreSQL with the `pgvector` extension. It includes a specialized "Dash Assistant" for semantic search over BI dashboards and charts.
 
-### Two Main Components:
+The codebase is designed to be primarily developed and maintained by an LLM agent (Cursor), with clear, concise documentation and a streamlined development environment.
 
-1. **ID-based RAG** - Files organized by `file_id` for integration with [LibreChat](https://librechat.ai)
-2. **Dash Assistant** - Dashboard and chart search system with multi-signal retrieval
+## Architecture
 
-The API evolves over time to employ different querying/re-ranking methods, embedding models, and vector stores.
+The system is composed of two main features (ID-based RAG and Dash Assistant) sharing a common infrastructure. Data ingestion is handled via CLI scripts, while querying is exposed through a FastAPI server.
 
-## Dashboard Assistant (MVP)
+```mermaid
+graph TD
+    subgraph "User / Client"
+        CLI("CLI / User")
+        Slack("Slack Workspace")
+    end
 
-Complete end-to-end setup for dashboard and chart search functionality.
+    subgraph "Application Layer (FastAPI)"
+        FastAPI["FastAPI Server<br/>(main.py)"]
+        APIRoutes["API Routes<br/>(/dash, /slack, /documents)"]
+        Middleware["Auth & Logging Middleware"]
+    end
+
+    subgraph "Core Services"
+        Ingestion["Data Ingestion Service<br/>(app/dash_assistant/ingestion)"]
+        Retriever["Multi-Signal Retriever<br/>(app/dash_assistant/serving)"]
+        RAG["ID-based RAG Service<br/>(app/routes/document_routes.py)"]
+    end
+
+    subgraph "Data & Storage"
+        PostgreSQL["PostgreSQL DB<br/>(pgvector extension)"]
+        Fixtures["Test Data<br/>(tests/fixtures/superset)"]
+        UserData["Production Data<br/>(data/production)"]
+    end
+
+    CLI -- "make demo / prod / ingest-complete" --> Ingestion
+    Ingestion -- "Loads from" --> Fixtures
+    Ingestion -- "Loads from" --> UserData
+    Ingestion -- "Writes to" --> PostgreSQL
+
+    User("User / API Client") -- "HTTP POST /dash/query" --> FastAPI
+    Slack -- "/dash-search" --> FastAPI
+
+    FastAPI --> Middleware --> APIRoutes
+
+    APIRoutes -- "/dash/*" --> Retriever
+    APIRoutes -- "/documents/*" --> RAG
+
+    Retriever -- "Reads from" --> PostgreSQL
+    RAG -- "Reads/Writes" --> PostgreSQL
+
+    Retriever -- "Returns results" --> APIRoutes
+    RAG -- "Returns documents" --> APIRoutes
+```
+
+## 🚀 Getting Started
+
+This project uses Docker for environment management and `make` for common commands.
 
 ### Prerequisites
-- Docker and Docker Compose
-- Python 3.10+ with dependencies installed
-- PostgreSQL with pgvector support
+- Docker & Docker Compose
+- `make` installed
 
-### Step-by-Step Setup
+### 1. Quick Demo
 
-#### 1. Start Database
+The fastest way to see the system in action is to run the demo. It uses sample data and mock embeddings, requiring no external API keys.
+
 ```bash
-docker compose up -d db
+# Start the demo stack, ingest sample data, and run health checks
+make demo
 ```
-Wait for PostgreSQL to be ready (health check will confirm).
+Once complete, the API will be available:
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check**: [http://localhost:8000/dash/health](http://localhost:8000/dash/health)
 
-#### 2. Run Database Migrations
-```bash
-python -m app.dash_assistant.migrate
-```
-This creates all necessary tables, indexes, and optimization functions.
+### 2. Production Mode
 
-#### 3. Load Dashboard Data
-```bash
-# Complete data ingestion pipeline
-python -m app.dash_assistant.ingestion.index_jobs \
-  --dashboards-csv tests/fixtures/superset/dashboards.csv \
-  --charts-csv tests/fixtures/superset/charts.csv \
-  --md-dir tests/fixtures/superset/md \
-  --enrichment-yaml tests/fixtures/superset/enrichment.yaml \
-  --complete
-```
+When you're ready to use your own data and connect to real embedding providers (like OpenAI).
 
-#### 4. Generate Vector Embeddings
 ```bash
-# Create embeddings for semantic search (only missing chunks)
-python -m app.dash_assistant.ingestion.index_jobs --only-missing
+# 1. Add your data to the `data/production/` directory.
+# You can copy the sample data as a template:
+cp -R tests/fixtures/superset/* data/production/
+
+# 2. Create and configure your environment file.
+# Copy the example and add your secrets (e.g., OpenAI API Key).
+cp dash_assistant.env.example .env
+
+# 3. Run the production startup script.
+# This will guide you through the setup process.
+make prod
 ```
 
-#### 5. Start API Server
+### 3. Development
+
+For active development, you can start the database separately and run the API locally or in a fast-reloading container.
+
 ```bash
+# Start just the database
+make docker-db
+
+# Run database migrations
+make migrate
+
+# (Optional) Load sample data for testing
+make ingest-complete
+
+# Run the FastAPI server with auto-reload
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-#### 6. Test Search Query
-```bash
-curl -X POST "http://localhost:8000/dash/query" \
-  -H "Content-Type: application/json" \
-  -d '{"q":"где найти retention","top_k":3}'
-```
-
-### Expected JSON Response Format
-
-```json
-{
-  "results": [
-    {
-      "title": "User Retention Dashboard",
-      "url": "https://superset.company.com/superset/dashboard/42/",
-      "score": 0.95,
-      "charts": [
-        {
-          "title": "Monthly Retention Cohorts",
-          "viz_type": "heatmap",
-          "url": "https://superset.company.com/explore/?slice_id=123"
-        }
-      ],
-      "why": "семантическая близость по содержимому, совпадения в тексте: retention"
-    },
-    {
-      "title": "Product Usage Metrics",
-      "url": "https://superset.company.com/superset/dashboard/15/",
-      "score": 0.78,
-      "charts": [
-        {
-          "title": "User Engagement Trends",
-          "viz_type": "line",
-          "url": "https://superset.company.com/explore/?slice_id=456"
-        }
-      ],
-      "why": "совпадение по заголовку, популярность учтена"
-    }
-  ],
-  "debug": {
-    "query_processing_time_ms": 145,
-    "total_candidates": 12,
-    "rrf_scores": {"42": 0.95, "15": 0.78},
-    "signal_sources": ["fts", "vector", "trigram"]
-  }
-}
-```
-
-### Slack Integration
-
-Complete Slack integration with slash commands and interactive buttons for dashboard search.
-
-#### Features
-- **Slash Commands**: `/dash-search <query>` for searching dashboards
-- **Interactive Buttons**: Feedback buttons that update after clicking
-- **Block Kit UI**: Rich formatting with dashboard links and charts
-- **Signature Verification**: Secure request validation
-- **Retry Protection**: Handles Slack retry requests properly
-
-#### Setup Slack App
-
-1. **Create Slack App** at https://api.slack.com/apps
-2. **Configure Slash Command**:
-   - Command: `/dash-search`
-   - Request URL: `https://your-domain.com/slack/command`
-   - Description: "Search dashboards"
-   - Usage Hint: `<query>`
-
-3. **Enable Interactivity**:
-   - Request URL: `https://your-domain.com/slack/interactive`
-
-4. **Set Environment Variables**:
-   ```bash
-   export SLACK_SIGNING_SECRET="your_signing_secret_here"
-   ```
-
-5. **Install App** to your workspace and invite bot to channels
-
-#### Slack Endpoints
-
-- `POST /slack/command` - Handles slash commands
-- `POST /slack/interactive` - Handles button interactions
-- `GET /slack/health` - Health check for Slack integration
-
-#### Interactive Button Behavior
-
-When users click feedback buttons (👍/👎), the buttons automatically update to show confirmation:
-- **👍** → **✅ Полезно** (green)
-- **👎** → **❌ Не полезно** (red)
-
-This provides immediate visual feedback that the action was processed.
-
-#### Example Slack Response Structure
-
-```json
-{
-  "response_type": "in_channel",
-  "text": "По запросу 'retention' найдено 2 дашбордов.",
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🔍 Найденные дашборды"
-      }
-    },
-    {
-      "type": "section",
-      "fields": [
-        {
-          "type": "mrkdwn",
-          "text": "*1. User Retention Dashboard*\n<https://superset.company.com/dashboard/42|Открыть дашборд>"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*Релевантность:* 0.95\n*Почему найден:* семантическая близость по содержимому"
-        }
-      ]
-    },
-    {
-      "type": "actions",
-      "block_id": "fb_123",
-      "elements": [
-        {
-          "type": "button",
-          "text": {"type": "plain_text", "text": "Открыть"},
-          "url": "https://superset.company.com/dashboard/42",
-          "style": "primary"
-        },
-        {
-          "type": "button",
-          "text": {"type": "plain_text", "text": "👍"},
-          "value": "{\"qid\": 123, \"vote\": \"up\", \"entity_id\": 42}",
-          "action_id": "feedback"
-        },
-        {
-          "type": "button",
-          "text": {"type": "plain_text", "text": "👎"},
-          "value": "{\"qid\": 123, \"vote\": \"down\", \"entity_id\": 42}",
-          "action_id": "feedback"
-        }
-      ]
-    }
-  ]
-}
-```
-
-#### Testing Slack Integration
-
-```bash
-# Test health check
-curl http://localhost:8000/slack/health
-
-# Test slash command (requires proper Slack signature)
-curl -X POST http://localhost:8000/slack/command \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "text=revenue analytics&user_id=U123&user_name=testuser"
-```
-
-## Docker Deployment
-
-### Quick Start with Docker Compose
-
-```bash
-# Start all services (database + API)
-docker-compose up -d
-
-# Run migrations
-docker-compose exec fastapi python -m app.dash_assistant.migrate
-
-# Check status
-docker-compose logs fastapi --tail=20
-curl http://localhost:8000/dash/health
-curl http://localhost:8000/slack/health
-```
-
-### Docker Environment Variables
-
-The `docker-compose.yaml` includes all necessary environment variables:
-
-```yaml
-environment:
-  - DB_HOST=db
-  - DB_PORT=5432
-  - DB_NAME=rag_api
-  - DB_USER=postgres
-  - DB_PASSWORD=password
-  - POSTGRES_HOST=db
-  - POSTGRES_PORT=5432
-  - POSTGRES_DB=rag_api
-  - POSTGRES_USER=postgres
-  - POSTGRES_PASSWORD=password
-```
-
-### Vector Embeddings Configuration
-
-The system uses **1536-dimensional embeddings** (compatible with OpenAI standard) to work with pgvector 0.5.1 limitations:
-
-- **Mock Embeddings** (default): Deterministic vectors for testing
-- **OpenAI Embeddings**: Set `EMBEDDINGS_PROVIDER=OPENAI` and `OPENAI_API_KEY`
-- **Dimension**: Configurable via `EMBEDDINGS_DIMENSION` (default: 1536)
-
-## Makefile Commands
-
-For convenience, use the provided Makefile:
-
-```bash
-# Complete setup (recommended for first time)
-make setup-complete
-
-# Development setup (DB + migrations only)  
-make setup-dev
-
-# Individual steps
-make docker-db          # Start database
-make migrate            # Run migrations
-make ingest-complete    # Load test data
-make optimize-db        # Optimize after loading
-
-# Utilities
-make migrate-list       # Check migration status
-make help              # Show all commands
-
-# Shortcuts for scripts
-make demo               # Run demo stack
-make prod               # Run production helper
-make monitor            # Show monitoring dashboard
-make test-api           # Run API smoke tests
-make ci-local           # Run local CI checks
-```
-
-For detailed instructions, see [Dash Assistant README](app/dash_assistant/README.md).
-
-## Continuous Integration
-
-The project includes GitHub Actions CI workflow (`.github/workflows/ci.yml`) that:
-
-- **Tests on Python 3.10 & 3.11** with matrix builds
-- **PostgreSQL 16 with pgvector** service for integration tests  
-- **MOCK embeddings provider** - no external API calls in CI
-- **Automated migrations** before running tests
-- **Code quality checks** - linting, formatting, type checking
-- **Security scanning** - bandit and safety checks
-- **Test coverage** reporting
-
-### CI Environment Variables
-
-The CI automatically sets:
-```yaml
-EMBEDDINGS_PROVIDER: MOCK      # No external API calls
-EMBEDDINGS_DIMENSION: 3072     # Test dimension
-POSTGRES_DB: rag_api          # Test database
-OPENAI_API_KEY: ""            # Explicitly empty
-```
-
-This ensures tests run deterministically without external dependencies.
-
-## Features
-- **Document Management**: Methods for adding, retrieving, and deleting documents.
-- **Vector Store**: Utilizes Langchain's vector store for efficient document retrieval.
-- **Asynchronous Support**: Offers async operations for enhanced performance.
-
-## Setup
-
-### Getting Started
-
-- **Configure `.env` file based on [section below](#environment-variables)**
-- **Setup pgvector database:**
-  - Run an existing PSQL/PGVector setup, or,
-  - Docker: `docker compose up` (also starts RAG API)
-- **Run API**:
-  - Docker: `docker compose up` (also starts PSQL/pgvector)
-  - Local:
-    - Make sure to setup `DB_HOST` to the correct database hostname
-    - Run the following commands (preferably in a [virtual environment](https://realpython.com/python-virtual-environments-a-primer/))
-```bash
-pip install -r requirements.txt
-uvicorn main:app
-```
-
-### Environment Variables
-
-The following environment variables are required to run the application:
-
-- `RAG_OPENAI_API_KEY`: The API key for OpenAI API Embeddings (if using default settings).
-    - Note: `OPENAI_API_KEY` will work but `RAG_OPENAI_API_KEY` will override it in order to not conflict with LibreChat setting.
-- `RAG_OPENAI_BASEURL`: (Optional) The base URL for your OpenAI API Embeddings
-- `RAG_OPENAI_PROXY`: (Optional) Proxy for OpenAI API Embeddings
-    - Note: When using with LibreChat, you can also set `HTTP_PROXY` and `HTTPS_PROXY` environment variables in the `docker-compose.override.yml` file (see [Proxy Configuration](#proxy-configuration) section below)
-- `VECTOR_DB_TYPE`: (Optional) select vector database type, default to `pgvector`.
-- `POSTGRES_USE_UNIX_SOCKET`: (Optional) Set to "True" when connecting to the PostgreSQL database server with Unix Socket.
-- `POSTGRES_DB`: (Optional) The name of the PostgreSQL database, used when `VECTOR_DB_TYPE=pgvector`.
-- `POSTGRES_USER`: (Optional) The username for connecting to the PostgreSQL database.
-- `POSTGRES_PASSWORD`: (Optional) The password for connecting to the PostgreSQL database.
-- `DB_HOST`: (Optional) The hostname or IP address of the PostgreSQL database server.
-- `DB_PORT`: (Optional) The port number of the PostgreSQL database server.
-- `RAG_HOST`: (Optional) The hostname or IP address where the API server will run. Defaults to "0.0.0.0"
-- `RAG_PORT`: (Optional) The port number where the API server will run. Defaults to port 8000.
-- `JWT_SECRET`: (Optional) The secret key used for verifying JWT tokens for requests.
-  - The secret is only used for verification. This basic approach assumes a signed JWT from elsewhere.
-  - Omit to run API without requiring authentication
-
-- `COLLECTION_NAME`: (Optional) The name of the collection in the vector store. Default value is "testcollection".
-- `CHUNK_SIZE`: (Optional) The size of the chunks for text processing. Default value is "1500".
-- `CHUNK_OVERLAP`: (Optional) The overlap between chunks during text processing. Default value is "100".
-- `RAG_UPLOAD_DIR`: (Optional) The directory where uploaded files are stored. Default value is "./uploads/".
-- `PDF_EXTRACT_IMAGES`: (Optional) A boolean value indicating whether to extract images from PDF files. Default value is "False".
-- `DEBUG_RAG_API`: (Optional) Set to "True" to show more verbose logging output in the server console, and to enable postgresql database routes
-- `DEBUG_PGVECTOR_QUERIES`: (Optional) Set to "True" to enable detailed PostgreSQL query logging for pgvector operations. Useful for debugging performance issues with vector database queries.
-- `CONSOLE_JSON`: (Optional) Set to "True" to log as json for Cloud Logging aggregations
-- `EMBEDDINGS_PROVIDER`: (Optional) either "openai", "bedrock", "azure", "huggingface", "huggingfacetei", "vertexai", or "ollama", where "huggingface" uses sentence_transformers; defaults to "openai"
-- `EMBEDDINGS_MODEL`: (Optional) Set a valid embeddings model to use from the configured provider.
-    - **Defaults**
-    - openai: "text-embedding-3-small"
-    - azure: "text-embedding-3-small" (will be used as your Azure Deployment)
-    - huggingface: "sentence-transformers/all-MiniLM-L6-v2"
-    - huggingfacetei: "http://huggingfacetei:3000". Hugging Face TEI uses model defined on TEI service launch.
-    - vertexai: "text-embedding-004"
-    - ollama: "nomic-embed-text"
-    - bedrock: "amazon.titan-embed-text-v1"
-- `RAG_AZURE_OPENAI_API_VERSION`: (Optional) Default is `2023-05-15`. The version of the Azure OpenAI API.
-- `RAG_AZURE_OPENAI_API_KEY`: (Optional) The API key for Azure OpenAI service.
-    - Note: `AZURE_OPENAI_API_KEY` will work but `RAG_AZURE_OPENAI_API_KEY` will override it in order to not conflict with LibreChat setting.
-- `RAG_AZURE_OPENAI_ENDPOINT`: (Optional) The endpoint URL for Azure OpenAI service, including the resource.
-    - Example: `https://YOUR_RESOURCE_NAME.openai.azure.com`.
-    - Note: `AZURE_OPENAI_ENDPOINT` will work but `RAG_AZURE_OPENAI_ENDPOINT` will override it in order to not conflict with LibreChat setting.
-- `HF_TOKEN`: (Optional) if needed for `huggingface` option.
-- `OLLAMA_BASE_URL`: (Optional) defaults to `http://ollama:11434`.
-- `ATLAS_SEARCH_INDEX`: (Optional) the name of the vector search index if using Atlas MongoDB, defaults to `vector_index`
-- `MONGO_VECTOR_COLLECTION`: Deprecated for MongoDB, please use `ATLAS_SEARCH_INDEX` and `COLLECTION_NAME`
-- `AWS_DEFAULT_REGION`: (Optional) defaults to `us-east-1`
-- `AWS_ACCESS_KEY_ID`: (Optional) needed for bedrock embeddings
-- `AWS_SECRET_ACCESS_KEY`: (Optional) needed for bedrock embeddings
-- `AWS_SESSION_TOKEN`: (Optional) may be needed for bedrock embeddings
-- `GOOGLE_APPLICATION_CREDENTIALS`: (Optional) needed for Google VertexAI embeddings. This should be a path to a service account credential file in JSON format, as accepted by [langchain](https://python.langchain.com/api_reference/google_vertexai/index.html)
-- `RAG_CHECK_EMBEDDING_CTX_LENGTH` (Optional) Default is true, disabling this will send raw input to the embedder, use this for custom embedding models.
-
-Make sure to set these environment variables before running the application. You can set them in a `.env` file or as system environment variables.
-
-### Use Atlas MongoDB as Vector Database
-
-Instead of using the default pgvector, we could use [Atlas MongoDB](https://www.mongodb.com/products/platform/atlas-vector-search) as the vector database. To do so, set the following environment variables
-
-```env
-VECTOR_DB_TYPE=atlas-mongo
-ATLAS_MONGO_DB_URI=<mongodb+srv://...>
-COLLECTION_NAME=<vector collection>
-ATLAS_SEARCH_INDEX=<vector search index>
-```
-
-The `ATLAS_MONGO_DB_URI` could be the same or different from what is used by LibreChat. Even if it is the same, the `$COLLECTION_NAME` collection needs to be a completely new one, separate from all collections used by LibreChat. In addition,  create a vector search index for collection above (remember to assign `$ATLAS_SEARCH_INDEX`) with the following json:
-
-```json
-{
-  "fields": [
-    {
-      "numDimensions": 1536,
-      "path": "embedding",
-      "similarity": "cosine",
-      "type": "vector"
-    },
-    {
-      "path": "file_id",
-      "type": "filter"
-    }
-  ]
-}
-```
-
-Follow one of the [four documented methods](https://www.mongodb.com/docs/atlas/atlas-vector-search/create-index/#procedure) to create the vector index.
-
-
-### Proxy Configuration
-
-When using the RAG API with LibreChat and you need to configure proxy settings, you can set the `HTTP_PROXY` and `HTTPS_PROXY` environment variables in the [`docker-compose.override.yml`](https://www.librechat.ai/docs/configuration/docker_override) file (from the LibreChat repository):
-
-```yaml
-rag_api:
-    environment:
-        - HTTP_PROXY=<your-proxy>
-        - HTTPS_PROXY=<your-proxy>
-```
-
-This configuration will ensure that all HTTP/HTTPS requests from the RAG API container are routed through your specified proxy server.
-
-
-### Cloud Installation Settings:
-
-#### AWS:
-Make sure your RDS Postgres instance adheres to this requirement:
-
-`The pgvector extension version 0.5.0 is available on database instances in Amazon RDS running PostgreSQL 15.4-R2 and higher, 14.9-R2 and higher, 13.12-R2 and higher, and 12.16-R2 and higher in all applicable AWS Regions, including the AWS GovCloud (US) Regions.`
-
-In order to setup RDS Postgres with RAG API, you can follow these steps:
-
-* Create a RDS Instance/Cluster using the provided [AWS Documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CreateDBInstance.html).
-* Login to the RDS Cluster using the Endpoint connection string from the RDS Console or from your IaC Solution output.
-* The login is via the *Master User*.
-* Create a dedicated database for rag_api:
-``` create database rag_api;```.
-* Create a dedicated user\role for that database:
-``` create role rag;```
-
-* Switch to the database you just created: ```\c rag_api```
-* Enable the Vector extension: ```create extension vector;```
-* Use the documentation provided above to set up the connection string to the RDS Postgres Instance\Cluster.
-
-Notes:
-  * Even though you're logging with a Master user, it doesn't have all the super user privileges, that's why we cannot use the command: ```create role x with superuser;```
-  * If you do not enable the extension, rag_api service will throw an error that it cannot create the extension due to the note above.
-
-### Dev notes:
-
-#### Installing pre-commit formatter
-
-Run the following commands to install pre-commit formatter, which uses [black](https://github.com/psf/black) code formatter:
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-## 🚀 Quick Demo Setup
-
-### Fast Development Mode
-For rapid development and testing without long Docker builds:
-
-```bash
-# Start demo with code mounted as volume (fast updates)
-docker-compose -f docker-compose.demo.yaml -f docker-compose.dev.yaml up -d
-
-# Test API endpoints
-./scripts/test-api.sh
-
-# Access Swagger UI (no auth required in demo)
-open http://localhost:8000/docs
-```
-
-**Benefits:**
-- ✅ Code changes apply instantly (no rebuild)
-- ✅ Starts in ~10 seconds vs 10+ minutes
-- ✅ Perfect for development and debugging
-
-### Slack Integration
-
-#### Setup
-1. **Enable Slack routes** (already done in main.py):
-   ```python
-   from app.dash_assistant.slack import router as slack_router
-   app.include_router(slack_router)
-   ```
-
-2. **Create ngrok tunnel**:
-   ```bash
-   ngrok http 8000
-   # Use the HTTPS URL in Slack App settings
-   ```
-
-3. **Configure Slack App** at https://api.slack.com/apps:
-   - **Slash Commands**: `/dash-search` → `https://your-ngrok-url/slack/command`
-   - **Interactivity**: On → `https://your-ngrok-url/slack/interactive`
-   - **OAuth Scopes**: `commands`, `chat:write`
-   - **Reinstall to Workspace**
-
-#### Usage
-```
-/dash-search retention
-```
-Returns formatted cards with 👍/👎 feedback buttons.
-
-#### Health Check
-```bash
-curl https://your-ngrok-url/slack/health
-# {"status":"healthy","service":"slack-integration"}
-```
-
-### Development Modes
-
-| Mode | Command | Use Case | Speed |
-|------|---------|----------|-------|
-| **Fast Dev** | `docker-compose -f docker-compose.demo.yaml -f docker-compose.dev.yaml up -d` | Development, debugging | ~10s |
-| **Full Build** | `docker-compose -f docker-compose.demo.yaml up -d --build` | Production testing | ~10min |
-
-### Demo Features
-- ✅ **No Authentication** required (DEMO_MODE=true)
-- ✅ **Mock Embeddings** (no OpenAI API key needed)
-- ✅ **Sample Data** (2 dashboards, 4 charts)
-- ✅ **Full Search** (FTS + Vector + Trigram)
-- ✅ **Query Logging** and **Feedback Tracking**
-- ✅ **Slack Integration** with interactive buttons
+## Key Features
+
+- **Dual RAG Systems**:
+    1.  **ID-based Document RAG**: For general document retrieval, compatible with systems like LibreChat.
+    2.  **Dash Assistant**: A specialized search system for BI dashboards using multi-signal retrieval (semantic, full-text, trigram) with Reciprocal Rank Fusion (RRF) to combine results.
+- **Dockerized Environment**: Consistent and reproducible setup for development and production.
+- **Makefile Interface**: Simplified commands for all common tasks (`make demo`, `make prod`, `make test-all`, `make lint`).
+- **Slack Integration**: Includes a ready-to-use Slack bot with slash commands (`/dash-search`) and interactive feedback buttons.
+- **Automated Migrations**: SQL-based migration system for evolving the database schema safely.
+- **CI/CD Ready**: GitHub Actions workflow for automated testing, linting, and security scanning.
+
+## Configuration
+
+Application settings are managed via environment variables, loaded by Pydantic.
+- A `dash_assistant.env.example` file is provided as a template. Copy it to `.env` for local development.
+- **`DEMO_MODE`**: Set to `true` to disable authentication and use mock embeddings. This is the default for `make demo`.
+- **`EMBEDDINGS_PROVIDER`**: Switches between `MOCK` and `OPENAI`.
+- **`POSTGRES_*`**: Standard PostgreSQL connection settings.
+- **`JWT_SECRET`**: A secret key to enable JWT authentication on API endpoints (disabled in demo mode).
+
+## For LLM Agents
+
+A detailed, technical "cheat sheet" for LLM development is available in `instructions.md`. It contains concise information on module structure, data flows, and development conventions.
 
