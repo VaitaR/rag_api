@@ -20,6 +20,16 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=5432
+      - DB_NAME=rag_api
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=rag_api
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - EMBEDDINGS_DIMENSION=1536
+      - EMBEDDINGS_DIM=1536
     ports:
       - "8000:8000"
     volumes:

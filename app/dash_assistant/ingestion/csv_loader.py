@@ -35,6 +35,17 @@ async def load_dashboards_csv(csv_path: Path) -> List[Dict[str, Any]]:
                     # Clean empty strings to None
                     cleaned_row = {k: v.strip() if v.strip() else None for k, v in row.items()}
                     
+                    # Auto-generate URL from superset_id if not provided or relative
+                    if cleaned_row.get('superset_id'):
+                        superset_id = cleaned_row['superset_id']
+                        url = cleaned_row.get('url', '')
+                        if not url or url.startswith('/'):
+                            cleaned_row['url'] = f"https://superset.walletteam.org/superset/dashboard/{superset_id}"
+                    
+                    # Auto-generate dashboard_slug from superset_id if empty
+                    if not cleaned_row.get('dashboard_slug') and cleaned_row.get('superset_id'):
+                        cleaned_row['dashboard_slug'] = f"dashboard-{cleaned_row['superset_id']}"
+                    
                     # Validate and normalize
                     normalized_dashboard = validate_and_normalize_dashboard(cleaned_row)
                     dashboards.append(normalized_dashboard)
@@ -80,6 +91,13 @@ async def load_charts_csv(csv_path: Path) -> List[Dict[str, Any]]:
                 try:
                     # Clean empty strings to None
                     cleaned_row = {k: v.strip() if v.strip() else None for k, v in row.items()}
+
+                    # Auto-generate absolute chart URL from superset_chart_id if not provided or relative
+                    if cleaned_row.get('superset_chart_id'):
+                        superset_chart_id = cleaned_row['superset_chart_id']
+                        url = cleaned_row.get('url', '')
+                        if not url or (isinstance(url, str) and url.startswith('/')):
+                            cleaned_row['url'] = f"https://superset.walletteam.org/superset/explore/?slice_id={superset_chart_id}"
                     
                     # Parse JSON fields if they exist
                     json_fields = ['metrics', 'dimensions', 'filters_default']
@@ -227,6 +245,17 @@ async def load_and_validate_dashboards_csv(csv_path: Path,
                     # Clean empty strings to None
                     cleaned_row = {k: v.strip() if v.strip() else None for k, v in row.items()}
                     
+                    # Auto-generate URL from superset_id if not provided or relative
+                    if cleaned_row.get('superset_id'):
+                        superset_id = cleaned_row['superset_id']
+                        url = cleaned_row.get('url', '')
+                        if not url or url.startswith('/'):
+                            cleaned_row['url'] = f"https://superset.walletteam.org/superset/dashboard/{superset_id}"
+                    
+                    # Auto-generate dashboard_slug from superset_id if empty
+                    if not cleaned_row.get('dashboard_slug') and cleaned_row.get('superset_id'):
+                        cleaned_row['dashboard_slug'] = f"dashboard-{cleaned_row['superset_id']}"
+                    
                     # Parse tags if present
                     if cleaned_row.get('tags'):
                         cleaned_row['tags'] = parse_csv_tags(cleaned_row['tags'])
@@ -282,6 +311,13 @@ async def load_and_validate_charts_csv(csv_path: Path) -> List[Dict[str, Any]]:
                 try:
                     # Clean empty strings to None
                     cleaned_row = {k: v.strip() if v.strip() else None for k, v in row.items()}
+
+                    # Auto-generate absolute chart URL from superset_chart_id if not provided or relative
+                    if cleaned_row.get('superset_chart_id'):
+                        superset_chart_id = cleaned_row['superset_chart_id']
+                        url = cleaned_row.get('url', '')
+                        if not url or (isinstance(url, str) and url.startswith('/')):
+                            cleaned_row['url'] = f"https://superset.walletteam.org/superset/explore/?slice_id={superset_chart_id}"
                     
                     # Parse JSON fields if they exist
                     json_fields = ['metrics', 'dimensions', 'filters_default']

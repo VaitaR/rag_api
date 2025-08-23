@@ -224,11 +224,15 @@ class IndexJob:
                 
                 # Update chunks with embeddings
                 for chunk_id, embedding in zip(chunk_ids, embeddings):
+                    # Convert numpy array to list for pgvector
+                    embedding_list = embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+                    # Convert to string format for pgvector: '[1.0, 2.0, 3.0]'
+                    embedding_str = str(embedding_list)
                     await self.db.execute_query("""
                         UPDATE bi_chunk 
-                        SET embedding = $1 
+                        SET embedding = $1::vector 
                         WHERE chunk_id = $2
-                    """, embedding.tolist(), chunk_id)
+                    """, embedding_str, chunk_id)
                 
                 processed_count += len(chunks)
                 logger.info(f"Updated {len(chunks)} chunks with embeddings")

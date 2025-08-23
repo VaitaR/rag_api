@@ -24,7 +24,7 @@ class DashAssistantConfig(BaseSettings):
         description="Embeddings provider to use"
     )
     embeddings_dimension: int = Field(
-        default=3072,
+        default=1536,
         alias="EMBEDDINGS_DIMENSION",
         gt=0,
         description="Dimension of embedding vectors"
