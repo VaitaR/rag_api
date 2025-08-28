@@ -76,7 +76,7 @@ class DashAssistantConfig(BaseSettings):
     # Optional API Keys
     openai_api_key: Optional[str] = Field(
         default=None,
-        alias="OPENAI_API_KEY",
+        alias="RAG_OPENAI_API_KEY",
         description="OpenAI API key for embeddings"
     )
     

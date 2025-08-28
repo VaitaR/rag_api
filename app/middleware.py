@@ -12,8 +12,8 @@ async def security_middleware(request: Request, call_next):
     async def next_middleware_call():
         return await call_next(request)
 
-    # Skip auth for docs and health endpoints
-    if request.url.path in {"/docs", "/openapi.json", "/health"}:
+    # Skip auth for docs, health endpoints, and Slack integration
+    if request.url.path in {"/docs", "/openapi.json", "/health"} or request.url.path.startswith("/slack/"):
         return await next_middleware_call()
     
     # Skip auth completely in demo mode
